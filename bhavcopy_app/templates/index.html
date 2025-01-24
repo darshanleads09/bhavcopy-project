@@ -4,149 +4,170 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BhavCopy Data</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <!-- FontAwesome CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
     <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
         table {
             width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            border: 1px solid black;
-            padding: 10px;
-            text-align: left;
         }
         th {
-            background-color: #f2f2f2;
+            background-color: #f8f9fa;
+        }
+        .pagination-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
         }
         .filter-container {
             margin-bottom: 20px;
         }
-        .pagination {
-            margin-top: 20px;
-            text-align: center;
-        }
-        .pagination button {
-            margin: 0 5px;
+        .spinner-border {
+            width: 1rem;
+            height: 1rem;
         }
     </style>
 </head>
 <body>
-    <h1>BhavCopy Data</h1>
+    <div class="container">
+        <h1 class="my-4 text-center">BhavCopy Data</h1>
 
-    <div class="filter-container">
-        <label for="start-date">Start Date:</label>
-        <input type="text" id="start-date" placeholder="Select start date">
-        <label for="end-date">End Date:</label>
-        <input type="text" id="end-date" placeholder="Select end date">
-        <label for="status">Status:</label>
-        <select id="status">
-            <option value="">All</option>
-            <option value="Success">Success</option>
-            <option value="Failed/Not Present">Failed/Not Present</option>
-        </select>
-        <button onclick="filterData()">Filter</button>
+        <!-- Filter Section -->
+        <div class="filter-container row mb-4">
+            <div class="col-md-4">
+                <label for="start-date">Start Date:</label>
+                <input type="text" id="start-date" class="form-control" placeholder="Select start date">
+            </div>
+            <div class="col-md-4">
+                <label for="end-date">End Date:</label>
+                <input type="text" id="end-date" class="form-control" placeholder="Select end date">
+            </div>
+            <div class="col-md-4">
+                <label for="status">Status:</label>
+                <select id="status" class="form-control">
+                    <option value="">All</option>
+                    <option value="Success">Success</option>
+                    <option value="Failed/Not Present">Failed/Not Present</option>
+                </select>
+            </div>
+        </div>
+        <button class="btn btn-primary mb-3" onclick="filterData()">Filter <i class="fas fa-filter"></i></button>
+
+        <!-- Table Section -->
+        <div class="table-responsive">
+            <table id="data-table" class="table table-bordered table-hover">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Date</th>
+                        <th>Weekday</th>
+                        <th>Number of Records</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- Pagination Section -->
+        <div class="pagination-container">
+            <button id="prev-button" class="btn btn-secondary" disabled><i class="fas fa-arrow-left"></i> Previous</button>
+            <span id="pagination-info"></span>
+            <button id="next-button" class="btn btn-secondary">Next <i class="fas fa-arrow-right"></i></button>
+        </div>
     </div>
 
-    <table id="data-table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Weekday</th>
-                <th>Number of Records</th>
-                <th>Status</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
-
-    <div class="pagination">
-        <button id="prev-button" disabled>Previous</button>
-        <span id="pagination-info"></span>
-        <button id="next-button">Next</button>
-    </div>
+    <!-- Bootstrap, jQuery, and jQuery-UI -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
 
     <script>
         let currentPage = 1;
-
         function filterData() {
             currentPage = 1; // Reset to the first page
             fetchData(currentPage);
             }
-
-
         // Initialize the datepickers
-        $(function () {
-            $("#start-date, #end-date").datepicker({
-                dateFormat: "yy-mm-dd"
-            });
+        $(() => {
+            $("#start-date, #end-date").datepicker({ dateFormat: "yy-mm-dd" });
         });
 
         // Fetch data with optional filters
-function fetchData(page = 1) {
-    const startDate = $("#start-date").val() || null;
-    const endDate = $("#end-date").val() || null;
-    const status = $("#status").val() || null;
+        const fetchData = async (page = 1) => {
+            const startDate = $("#start-date").val() || null;
+            const endDate = $("#end-date").val() || null;
+            const status = $("#status").val() || null;
+            const url = `/data/?page=${page}&start_date=${startDate}&end_date=${endDate}&status=${status}`;
+            console.log(`Fetching data from: ${url}`);
 
-    const url = `/data/?page=${page}&start_date=${startDate}&end_date=${endDate}&status=${status}`;
-    console.log(`Fetching data from: ${url}`); // Log the URL for debugging
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                console.log("Data returned from server:", data);
 
-    $.get(url, function (data) {
-        console.log("Data returned from server:", data); // Print the response to console
-        const tableBody = $("#data-table tbody");
-        tableBody.empty();
+                const tableBody = $("#data-table tbody");
+                tableBody.empty();
 
-        if (data.results.length === 0) {
-            tableBody.append(`<tr><td colspan="5">No records found</td></tr>`); // Ensure colspan matches the table headers
-        } else {
-            data.results.forEach(row => {
-                const actionButton = `<button onclick="reloadData('${row.BizDt}')">Reload</button>`;
-                tableBody.append(`
-                    <tr>
-                        <td>${row.BizDt}</td>
-                        <td>${row.Weekday}</td>
-                        <td>${row.RecordCount}</td>
-                        <td>${row.Status}</td>
-                        <td>${actionButton}</td>
-                    </tr>
-                `);
-            });
-        }
+                if (data.results.length === 0) {
+                    tableBody.append(`<tr><td colspan="5" class="text-center">No records found</td></tr>`);
+                } else {
+                    data.results.forEach(row => {
+                        const actionButton = `<button class="btn btn-sm btn-warning" onclick="reloadData('${row.BizDt}')">
+                            Reload <i class="fas fa-sync-alt"></i>
+                        </button>`;
+                        tableBody.append(`
+                            <tr>
+                                <td>${row.BizDt}</td>
+                                <td>${row.Weekday}</td>
+                                <td>${row.RecordCount}</td>
+                                <td>${row.Status}</td>
+                                <td>${actionButton}</td>
+                            </tr>
+                        `);
+                    });
+                }
 
-        // Update pagination
-        $("#pagination-info").text(`Page ${data.current_page} of ${data.total_pages}`);
-        $("#prev-button").prop("disabled", !data.has_previous);
-        $("#next-button").prop("disabled", !data.has_next);
+                // Update pagination
+                $("#pagination-info").text(`Page ${data.current_page} of ${data.total_pages}`);
+                $("#prev-button").prop("disabled", !data.has_previous);
+                $("#next-button").prop("disabled", !data.has_next);
 
-        currentPage = data.current_page;
-    }).fail(function (xhr, status, error) {
-        console.error("Error fetching data:", error); // Log any errors
-        alert("Failed to fetch data. Please check the server logs for details.");
-    });
-}
-
-// Reload data for a specific date
-function reloadData(date) {
-    fetch(`/reload/${date}/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-    })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert(`Data for ${date} reloaded successfully!`);
-                fetchData(currentPage); // Refresh data
-            } else {
-                alert(`Failed to reload data for ${date}: ${data.error}`);
+                currentPage = data.current_page;
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                alert("Failed to fetch data. Please check the server logs for details.");
             }
-        })
-        .catch(error => {
-            console.error("Error reloading data:", error);
-            alert("An unexpected error occurred while reloading data.");
-        });
-}
+        };
+
+        // Reload data for a specific date
+        const reloadData = async (date) => {
+            try {
+                const response = await fetch(`/reload/${date}/`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" }
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`Data for ${date} reloaded successfully!`);
+                    fetchData(currentPage);
+                } else {
+                    alert(`Failed to reload data for ${date}: ${data.error}`);
+                }
+            } catch (error) {
+                console.error("Error reloading data:", error);
+                alert("An unexpected error occurred while reloading data.");
+            }
+        };
 
         // Pagination buttons
         $("#prev-button").click(() => fetchData(currentPage - 1));
