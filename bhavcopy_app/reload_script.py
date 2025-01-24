@@ -4,11 +4,22 @@ import requests
 import zipfile
 import io
 import os
-import sys
 from datetime import datetime
 
 DATA_DIR = "D:/bhavcopy_data/"
 DB_PATH = "C:\\Users\\Darshan\\Downloads\\sqlite-tools-win-x64-3480000\\bhavcopy_data.db"
+
+def fetch_cookies():
+    """Fetch cookies from NSE India to establish a valid session."""
+    try:
+        response = requests.Session().get(
+            "https://www.nseindia.com",
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+        return response.cookies
+    except requests.RequestException as e:
+        print(f"Failed to fetch cookies: {e}")
+        return None
 
 def reload_data_for_date(date_str):
     """Reload data for the specified date."""
@@ -17,16 +28,23 @@ def reload_data_for_date(date_str):
         reload_date = datetime.strptime(date_str, '%Y-%m-%d')
         date_str = reload_date.strftime("%Y%m%d")
 
-        # Step 1: Download the file
+        # Fetch cookies
+        cookies = fetch_cookies()
+        if not cookies:
+            return {"success": False, "error": "Failed to fetch cookies from NSE."}
+
+        # Download the file
         file_url = f"https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{date_str}_F_0000.csv.zip"
         headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(file_url, headers=headers, timeout=30)
+        response = requests.get(file_url, headers=headers, cookies=cookies, timeout=30)
+
+        if response.status_code == 404:
+            return {"success": False, "error": f"File for {date_str} not found on NSE server."}
 
         if response.status_code != 200:
-            print(f"Failed to download file for {date_str}. Status Code: {response.status_code}")
-            return False
+            return {"success": False, "error": f"Failed to download file for {date_str}. Status Code: {response.status_code}"}
 
-        # Step 2: Extract the file
+        # Extract the file
         output_dir = os.path.join(DATA_DIR, date_str)
         os.makedirs(output_dir, exist_ok=True)
 
@@ -44,10 +62,9 @@ def reload_data_for_date(date_str):
                 break
 
         if not csv_file:
-            print(f"No CSV file found for {date_str}.")
-            return False
+            return {"success": False, "error": f"No CSV file found for {date_str}."}
 
-        # Step 3: Insert data into SQLite database
+        # Insert data into SQLite database
         df = pd.read_csv(csv_file)
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
@@ -68,16 +85,21 @@ def reload_data_for_date(date_str):
             conn.commit()
 
         print(f"Data for {date_str} successfully inserted into the database.")
-        return True
+        return {"success": True, "message": f"Data for {date_str} successfully reloaded."}
 
     except Exception as e:
         print(f"Error reloading data for {date_str}: {e}")
-        return False
+        return {"success": False, "error": str(e)}
 
 if __name__ == "__main__":
+    import sys
     if len(sys.argv) < 2:
         print("Usage: python reload_script.py <YYYY-MM-DD>")
         sys.exit(1)
 
     date_input = sys.argv[1]
-    reload_data_for_date(date_input)
+    result = reload_data_for_date(date_input)
+    if result["success"]:
+        print(result["message"])
+    else:
+        print(f"Error: {result['error']}")

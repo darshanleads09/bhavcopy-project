@@ -1,11 +1,15 @@
+import logging
+from datetime import datetime, timedelta
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
-from .models import BhavCopy
-from .reload_script import reload_data_for_date
-from django.shortcuts import render
-from django.db.models import Count
 from django.core.paginator import Paginator
+from django.db.models import Count, Value
+from django.db.models.functions import Coalesce
+from .models import BhavCopy
+from django.shortcuts import render
+from django.db import models
+import calendar  # Add this import
 
+logger = logging.getLogger(__name__)
 
 def index(request):
     """Render the index.html template."""
@@ -13,54 +17,87 @@ def index(request):
 
 
 def get_data(request):
-    page = int(request.GET.get('page', 1))
-    date_filter = request.GET.get('date', None)
+    try:
+        logger.debug("Received request for data.")
 
-    # Filter data by date if provided
-    queryset = BhavCopy.objects.values('BizDt').annotate(
-        RecordCount=Count('FinInstrmId')  # Use FinInstrmId instead of id
-    ).order_by('-BizDt')
+        # Extracting query parameters
+        page = int(request.GET.get("page", 1))
+        start_date = request.GET.get("start_date", None)
+        end_date = request.GET.get("end_date", None)
+        status = request.GET.get("status", None)
 
-    if date_filter:
-        queryset = queryset.filter(BizDt=date_filter)
+        logger.debug(f"Request parameters - page: {page}, start_date: {start_date}, end_date: {end_date}, status: {status}")
 
-    # Pagination logic
-    per_page = 10
-    total_records = queryset.count()
-    total_pages = (total_records + per_page - 1) // per_page
-    start = (page - 1) * per_page
-    end = start + per_page
+        # Handle null parameters by defaulting to the current month
+        if not start_date or start_date == "null":
+            start_date = datetime.now().date().replace(day=1)  # First day of the current month
+        else:
+            start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
 
-    data = list(queryset[start:end])
-    for row in data:
-        row['Status'] = 'Success' if row['RecordCount'] > 0 else 'Failed/Not Present'
+        if not end_date or end_date == "null":
+            end_date = (datetime.now().date().replace(day=1) + timedelta(days=31)).replace(day=1) - timedelta(days=1)  # Last day of the current month
+        else:
+            end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
 
-    return JsonResponse({
-        "results": data,
-        "current_page": page,
-        "total_pages": total_pages,
-        "has_previous": page > 1,
-        "has_next": page < total_pages
-    })
+        logger.debug(f"Parsed date range - start_date: {start_date}, end_date: {end_date}")
 
+        # Query the database with filters
+        queryset = BhavCopy.objects.filter(BizDt__range=(start_date, end_date)).values('BizDt').annotate(
+            RecordCount=Count('FinInstrmId'),
+            Status=Value('Success', output_field=models.CharField())
+        )
+
+        # Create a complete date range for the month
+        date_range = [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]
+
+        # Fill in missing dates
+        queryset_dates = {record["BizDt"]: record for record in queryset}
+        final_results = []
+        for date in date_range:
+            if date in queryset_dates:
+                record = queryset_dates[date]
+                record["Weekday"] = calendar.day_name[date.weekday()]
+                final_results.append(record)
+            else:
+                final_results.append({
+                    "BizDt": date,
+                    "RecordCount": 0,
+                    "Status": "Failed/Not Present",
+                    "Weekday": calendar.day_name[date.weekday()]
+                })
+
+        # Paginate results
+        paginator = Paginator(final_results, 10)
+        results = paginator.page(page)
+
+        return JsonResponse({
+            "results": list(results),
+            "current_page": results.number,
+            "total_pages": paginator.num_pages,
+            "has_next": results.has_next(),
+            "has_previous": results.has_previous()
+        })
+
+    except Exception as e:
+        logger.error(f"Error in get_data: {e}")
+        return JsonResponse({"error": str(e)}, status=500)
+
+from django.http import JsonResponse
+from .reload_script import reload_data_for_date
+import logging
 
 def reload_date(request, date):
+    """Reload data for a specific date."""
     try:
-        # Check if records exist for the date
-        bhav_copies = BhavCopy.objects.filter(BizDt=date)
-
-        if bhav_copies.exists():
-            return JsonResponse({"success": True, "message": f"Data for {date} already exists!"})
-
-        # Perform reload logic here (e.g., download and insert records)
-        # Assuming a function `reload_data_from_nse` does this
-        success = reload_data_for_date(date)
-
-        if success:
-            return JsonResponse({"success": True, "message": f"Data for {date} reloaded successfully!"})
+        result = reload_data_for_date(date)
+        if result["success"]:
+            return JsonResponse({"success": True, "message": result["message"]})
         else:
-            return JsonResponse({"success": False, "error": "Failed to reload data from NSE."})
-
+            return JsonResponse({"success": False, "error": result["error"]})
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)})
 
+
+
+# Ensure proper logging setup
+logging.basicConfig(level=logging.DEBUG)

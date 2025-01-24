@@ -36,15 +36,24 @@
     <h1>BhavCopy Data</h1>
 
     <div class="filter-container">
-        <label for="filter-date">Filter by Date:</label>
-        <input type="text" id="filter-date" placeholder="Select a date">
-        <button onclick="filterByDate()">Filter</button>
+        <label for="start-date">Start Date:</label>
+        <input type="text" id="start-date" placeholder="Select start date">
+        <label for="end-date">End Date:</label>
+        <input type="text" id="end-date" placeholder="Select end date">
+        <label for="status">Status:</label>
+        <select id="status">
+            <option value="">All</option>
+            <option value="Success">Success</option>
+            <option value="Failed/Not Present">Failed/Not Present</option>
+        </select>
+        <button onclick="filterData()">Filter</button>
     </div>
 
     <table id="data-table">
         <thead>
             <tr>
                 <th>Date</th>
+                <th>Weekday</th>
                 <th>Number of Records</th>
                 <th>Status</th>
                 <th>Action</th>
@@ -61,92 +70,83 @@
 
     <script>
         let currentPage = 1;
-        let isFiltered = false;
 
-        // Initialize the datepicker
+        function filterData() {
+            currentPage = 1; // Reset to the first page
+            fetchData(currentPage);
+            }
+
+
+        // Initialize the datepickers
         $(function () {
-            $("#filter-date").datepicker({
+            $("#start-date, #end-date").datepicker({
                 dateFormat: "yy-mm-dd"
             });
         });
 
-        // Fetch data with optional date filtering
-        function fetchData(page = 1, filterDate = null) {
-            const url = filterDate ? `/data/?page=${page}&date=${filterDate}` : `/data/?page=${page}`;
-            $.get(url, function (data) {
-                const tableBody = $("#data-table tbody");
-                tableBody.empty();
+        // Fetch data with optional filters
+function fetchData(page = 1) {
+    const startDate = $("#start-date").val() || null;
+    const endDate = $("#end-date").val() || null;
+    const status = $("#status").val() || null;
 
-                if (data.results.length === 0) {
-                    // No data for the filtered date
-                    tableBody.append(`
-                        <tr>
-                            <td>${filterDate}</td>
-                            <td>0</td>
-                            <td>Failed/Not Present</td>
-                            <td><button onclick="reloadData('${filterDate}')">Reload</button></td>
-                        </tr>
-                    `);
-                } else {
-                    // Populate table with data
-                    data.results.forEach(row => {
-                        const actionButton = `<button onclick="reloadData('${row.BizDt}')">Reload</button>`;
-                        tableBody.append(`
-                            <tr>
-                                <td>${row.BizDt}</td>
-                                <td>${row.RecordCount}</td>
-                                <td>${row.Status}</td>
-                                <td>${actionButton}</td>
-                            </tr>
-                        `);
-                    });
-                }
+    const url = `/data/?page=${page}&start_date=${startDate}&end_date=${endDate}&status=${status}`;
+    console.log(`Fetching data from: ${url}`); // Log the URL for debugging
 
-                // Update pagination
-                $("#pagination-info").text(`Page ${data.current_page} of ${data.total_pages}`);
-                $("#prev-button").prop("disabled", !data.has_previous);
-                $("#next-button").prop("disabled", !data.has_next);
+    $.get(url, function (data) {
+        console.log("Data returned from server:", data); // Print the response to console
+        const tableBody = $("#data-table tbody");
+        tableBody.empty();
 
-                // Update current page
-                currentPage = data.current_page;
+        if (data.results.length === 0) {
+            tableBody.append(`<tr><td colspan="5">No records found</td></tr>`); // Ensure colspan matches the table headers
+        } else {
+            data.results.forEach(row => {
+                const actionButton = `<button onclick="reloadData('${row.BizDt}')">Reload</button>`;
+                tableBody.append(`
+                    <tr>
+                        <td>${row.BizDt}</td>
+                        <td>${row.Weekday}</td>
+                        <td>${row.RecordCount}</td>
+                        <td>${row.Status}</td>
+                        <td>${actionButton}</td>
+                    </tr>
+                `);
             });
         }
 
-        // Filter data by date
-        function filterByDate() {
-            const filterDate = $("#filter-date").val();
-            if (filterDate) {
-                isFiltered = true;
-                fetchData(1, filterDate); // Fetch filtered data
-            } else {
-                alert("Please select a date to filter.");
-            }
-        }
+        // Update pagination
+        $("#pagination-info").text(`Page ${data.current_page} of ${data.total_pages}`);
+        $("#prev-button").prop("disabled", !data.has_previous);
+        $("#next-button").prop("disabled", !data.has_next);
 
-        // Reload data for a specific date
-        function reloadData(date) {
-            fetch(`/reload/${date}/`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" }
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert(`Data for ${date} reloaded successfully!`);
-                        if (isFiltered) {
-                            fetchData(1, date); // Refresh filtered data
-                        } else {
-                            fetchData(currentPage); // Refresh the current page
-                        }
-                    } else {
-                        alert(`Failed to reload data for ${date}: ${data.error}`);
-                    }
-                })
-                .catch(error => {
-                    console.error("Error reloading data:", error);
-                    alert("An error occurred while reloading data.");
-                });
-        }
+        currentPage = data.current_page;
+    }).fail(function (xhr, status, error) {
+        console.error("Error fetching data:", error); // Log any errors
+        alert("Failed to fetch data. Please check the server logs for details.");
+    });
+}
+
+// Reload data for a specific date
+function reloadData(date) {
+    fetch(`/reload/${date}/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Data for ${date} reloaded successfully!`);
+                fetchData(currentPage); // Refresh data
+            } else {
+                alert(`Failed to reload data for ${date}: ${data.error}`);
+            }
+        })
+        .catch(error => {
+            console.error("Error reloading data:", error);
+            alert("An unexpected error occurred while reloading data.");
+        });
+}
 
         // Pagination buttons
         $("#prev-button").click(() => fetchData(currentPage - 1));
