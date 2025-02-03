@@ -121,9 +121,12 @@
                     tableBody.append(`<tr><td colspan="5" class="text-center">No records found</td></tr>`);
                 } else {
                     data.results.forEach(row => {
-                        const actionButton = `<button class="btn btn-sm btn-warning" onclick="reloadData('${row.BizDt}')">
-                            Reload <i class="fas fa-sync-alt"></i>
-                        </button>`;
+                // Disable reload button if RecordCount > 0
+                const isDisabled = row.RecordCount > 0 ? "disabled" : "";
+                
+                const actionButton = `<button class="btn btn-sm btn-warning" onclick="reloadData('${row.BizDt}')" ${isDisabled}>
+                    Reload <i class="fas fa-sync-alt"></i>
+                </button>`;
                         tableBody.append(`
                             <tr>
                                 <td>${row.BizDt}</td>
