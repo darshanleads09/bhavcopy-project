@@ -75,10 +75,16 @@ WSGI_APPLICATION = 'bhavcopy_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+from config import DB_CONFIG
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': 'C:/Users/Darshan/Downloads/sqlite-tools-win-x64-3480000/bhavcopy_data.db',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': DB_CONFIG['database'],
+        'USER': DB_CONFIG['user'],
+        'PASSWORD': DB_CONFIG['password'],
+        'HOST': DB_CONFIG['host'],
+        'PORT': DB_CONFIG['port'],
     }
 }
 
