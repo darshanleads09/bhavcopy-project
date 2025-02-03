@@ -42,15 +42,15 @@
 
         <!-- Filter Section -->
         <div class="filter-container row mb-4">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label for="start-date">Start Date:</label>
                 <input type="text" id="start-date" class="form-control" placeholder="Select start date">
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label for="end-date">End Date:</label>
                 <input type="text" id="end-date" class="form-control" placeholder="Select end date">
             </div>
-            <div class="col-md-4">
+            <div class="col-md-2">
                 <label for="status">Status:</label>
                 <select id="status" class="form-control">
                     <option value="">All</option>
@@ -58,7 +58,25 @@
                     <option value="Failed/Not Present">Failed/Not Present</option>
                 </select>
             </div>
+            <div class="col-md-2">
+                <label for="sgmt">Segment:</label>
+                <select id="sgmt" class="form-control">
+                    <option value="">All</option>
+                    <option value="CM">CM</option>
+                    <option value="FO">FO</option>
+                    <option value="CDS">CDS</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="src">Source:</label>
+                <select id="src" class="form-control">
+                    <option value="">All</option>
+                    <option value="NSE">NSE</option>
+                    <option value="BSE">BSE</option>
+                </select>
+            </div>
         </div>
+
         <button class="btn btn-primary mb-3" onclick="filterData()">Filter <i class="fas fa-filter"></i></button>
 
         <!-- Table Section -->
@@ -68,6 +86,8 @@
                     <tr>
                         <th>Date</th>
                         <th>Weekday</th>
+                        <th>Segment</th>
+                        <th>Source</th>
                         <th>Number of Records</th>
                         <th>Status</th>
                         <th>Action</th>
@@ -92,10 +112,12 @@
 
     <script>
         let currentPage = 1;
+
         function filterData() {
             currentPage = 1; // Reset to the first page
             fetchData(currentPage);
-            }
+        }
+
         // Initialize the datepickers
         $(() => {
             $("#start-date, #end-date").datepicker({ dateFormat: "yy-mm-dd" });
@@ -106,7 +128,10 @@
             const startDate = $("#start-date").val() || null;
             const endDate = $("#end-date").val() || null;
             const status = $("#status").val() || null;
-            const url = `/data/?page=${page}&start_date=${startDate}&end_date=${endDate}&status=${status}`;
+            const sgmt = $("#sgmt").val() || null;
+            const src = $("#src").val() || null;
+
+            const url = `/data/?page=${page}&start_date=${startDate}&end_date=${endDate}&status=${status}&sgmt=${sgmt}&src=${src}`;
             console.log(`Fetching data from: ${url}`);
 
             try {
@@ -118,19 +143,22 @@
                 tableBody.empty();
 
                 if (data.results.length === 0) {
-                    tableBody.append(`<tr><td colspan="5" class="text-center">No records found</td></tr>`);
+                    tableBody.append(`<tr><td colspan="7" class="text-center">No records found</td></tr>`);
                 } else {
                     data.results.forEach(row => {
-                // Disable reload button if RecordCount > 0
-                const isDisabled = row.RecordCount > 0 ? "disabled" : "";
-                
-                const actionButton = `<button class="btn btn-sm btn-warning" onclick="reloadData('${row.BizDt}')" ${isDisabled}>
-                    Reload <i class="fas fa-sync-alt"></i>
-                </button>`;
+                        // Disable reload button if RecordCount > 0
+                        const isDisabled = row.RecordCount > 0 ? "disabled" : "";
+
+                        const actionButton = `<button class="btn btn-sm btn-warning" onclick="reloadData('${row.BizDt}')" ${isDisabled}>
+                            Reload <i class="fas fa-sync-alt"></i>
+                        </button>`;
+
                         tableBody.append(`
                             <tr>
                                 <td>${row.BizDt}</td>
                                 <td>${row.Weekday}</td>
+                                <td>${row.Sgmt}</td>
+                                <td>${row.Src}</td>
                                 <td>${row.RecordCount}</td>
                                 <td>${row.Status}</td>
                                 <td>${actionButton}</td>

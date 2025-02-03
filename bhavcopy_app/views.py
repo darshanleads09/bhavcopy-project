@@ -25,8 +25,10 @@ def get_data(request):
         start_date = request.GET.get("start_date", None)
         end_date = request.GET.get("end_date", None)
         status = request.GET.get("status", None)
+        sgmt = request.GET.get("sgmt", None)
+        src = request.GET.get("src", None)
 
-        logger.debug(f"Request parameters - page: {page}, start_date: {start_date}, end_date: {end_date}, status: {status}")
+        logger.debug(f"Request parameters - page: {page}, start_date: {start_date}, end_date: {end_date}, status: {status}, sgmt: {sgmt}, src: {src}")
 
         # Handle null parameters by defaulting to the current month
         if not start_date or start_date == "null":
@@ -42,10 +44,19 @@ def get_data(request):
         logger.debug(f"Parsed date range - start_date: {start_date}, end_date: {end_date}")
 
         # Query the database with filters
-        queryset = BhavCopy.objects.filter(BizDt__range=(start_date, end_date)).values('BizDt').annotate(
+        queryset = BhavCopy.objects.filter(BizDt__range=(start_date, end_date))
+
+        if sgmt and sgmt != "null":
+            queryset = queryset.filter(Sgmt=sgmt)
+
+        if src and src != "null":
+            queryset = queryset.filter(Src=src)
+
+        queryset = queryset.values('BizDt', 'Sgmt', 'Src').annotate(
             RecordCount=Count('FinInstrmId'),
             Status=Value('Success', output_field=models.CharField())
         )
+
 
         # Create a complete date range for the month
         date_range = [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]
@@ -81,6 +92,7 @@ def get_data(request):
     except Exception as e:
         logger.error(f"Error in get_data: {e}")
         return JsonResponse({"error": str(e)}, status=500)
+
 
 from django.http import JsonResponse
 from .reload_script import reload_data_for_date
