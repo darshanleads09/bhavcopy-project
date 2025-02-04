@@ -5,7 +5,7 @@ import zipfile
 import io
 import os
 from datetime import datetime
-from config import DB_CONFIG
+from config import DB_CONFIG, BASE_URLS
 import time
 import mysql.connector
 import numpy as np
@@ -42,7 +42,7 @@ def clean_data(df):
         raise
 
 
-def reload_data_for_date(date_str):
+def reload_data_for_date(date_str, sgmt="CM", src="NSE"):
     """Reload data for the specified date with detailed error handling and MySQL insertion."""
     try:
         # Format date for NSE URL
@@ -66,8 +66,17 @@ def reload_data_for_date(date_str):
             "X-Requested-With": "XMLHttpRequest"
         }
 
+        # Determine the correct file URL
+        url_key = f"{sgmt}_{src}"  # Example: CM_NSE, FO_NSE, CD_NSE
+        if url_key not in BASE_URLS:
+            print(f"Error: No matching URL for segment {sgmt} and source {src}")
+            return {"success": False, "error": f"No URL defined for Sgmt={sgmt}, Src={src}"}
+        
         # File download URL
-        file_url = f"https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{date_str_formatted}_F_0000.csv.zip"
+        #file_url = f"https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{date_str_formatted}_F_0000.csv.zip"
+        file_url = BASE_URLS[url_key].format(date=date_str_formatted)
+
+        print(f"Selected URL: {file_url}")
 
         # Attempt to download the file with retry logic
         max_retries = 3

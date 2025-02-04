@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import datetime, timedelta
 from django.http import JsonResponse
@@ -101,7 +102,14 @@ import logging
 def reload_date(request, date):
     """Reload data for a specific date."""
     try:
-        result = reload_data_for_date(date)
+        # Parse sgmt and src from the request body
+        body = json.loads(request.body)
+        sgmt = body.get("sgmt", "CM")  # Default to CM if not provided
+        src = body.get("src", "NSE")  # Default to NSE if not provided
+
+        print(f"Reloading for Date: {date}, Segment: {sgmt}, Source: {src}")
+
+        result = reload_data_for_date(date, sgmt, src)
         if result["success"]:
             return JsonResponse({"success": True, "message": result["message"]})
         else:

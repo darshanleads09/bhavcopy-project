@@ -61,10 +61,9 @@
             <div class="col-md-2">
                 <label for="sgmt">Segment:</label>
                 <select id="sgmt" class="form-control">
-                    <option value="">All</option>
-                    <option value="CM">CM</option>
-                    <option value="FO">FO</option>
-                    <option value="CDS">CDS</option>
+                    <option value="CM">CM (Cash Market)</option>
+                    <option value="FO">FO (Futures & Options)</option>
+                    <option value="CD">CD (Currency Derivatives)</option>
                 </select>
             </div>
             <div class="col-md-2">
@@ -128,8 +127,8 @@
             const startDate = $("#start-date").val() || null;
             const endDate = $("#end-date").val() || null;
             const status = $("#status").val() || null;
-            const sgmt = $("#sgmt").val() || null;
-            const src = $("#src").val() || null;
+            const sgmt = $("#sgmt").val() || "CM";
+            const src = $("#src").val() || "NSE";
 
             const url = `/data/?page=${page}&start_date=${startDate}&end_date=${endDate}&status=${status}&sgmt=${sgmt}&src=${src}`;
             console.log(`Fetching data from: ${url}`);
@@ -182,10 +181,17 @@
         // Reload data for a specific date
         const reloadData = async (date) => {
             try {
+                const sgmt = $("#sgmt").val(); // Get selected segment value
+                const src = $("#src").val(); // Get selected source value
+
                 const response = await fetch(`/reload/${date}/`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" }
-                });
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            sgmt: sgmt,
+                            src: src,
+                        }),
+                    });
                 const data = await response.json();
 
                 if (data.success) {

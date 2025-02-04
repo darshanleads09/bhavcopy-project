@@ -14,3 +14,11 @@ DB_CONFIG = {
     'database': 'bhavcopynew',  # Replace with the name of the database you want to connect to
     'port': 3306  # Default MySQL port (if you're using a non-standard port, update accordingly)
 }
+
+# Base URLs for different segments
+BASE_URLS = {
+    "CM_NSE": "https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{date}_F_0000.csv.zip",
+    "FO_NSE": "https://nsearchives.nseindia.com/content/fo/BhavCopy_NSE_FO_0_0_0_{date}_F_0000.csv.zip",
+    "CD_NSE": "https://nsearchives.nseindia.com/archives/cd/bhav/BhavCopy_NSE_CD_0_0_0_{date}_F_0000.csv.zip"
+}
+
