@@ -53,7 +53,7 @@
             <div class="col-md-2">
                 <label for="status">Status:</label>
                 <select id="status" class="form-control">
-                    <option value="">All</option>
+                    <option value="All">All</option>
                     <option value="Success">Success</option>
                     <option value="Failed/Not Present">Failed/Not Present</option>
                 </select>
@@ -61,15 +61,16 @@
             <div class="col-md-2">
                 <label for="sgmt">Segment:</label>
                 <select id="sgmt" class="form-control">
+                    <option value="All">All</option>
                     <option value="CM">CM (Cash Market)</option>
                     <option value="FO">FO (Futures & Options)</option>
                     <option value="CD">CD (Currency Derivatives)</option>
-                </select>
+                </select>                
             </div>
             <div class="col-md-2">
                 <label for="src">Source:</label>
                 <select id="src" class="form-control">
-                    <option value="">All</option>
+                    <option value="All">All</option>
                     <option value="NSE">NSE</option>
                     <option value="BSE">BSE</option>
                 </select>
@@ -127,8 +128,8 @@
             const startDate = $("#start-date").val() || null;
             const endDate = $("#end-date").val() || null;
             const status = $("#status").val() || null;
-            const sgmt = $("#sgmt").val() || "CM";
-            const src = $("#src").val() || "NSE";
+            const sgmt = $("#sgmt").val() || null; // Empty string indicates "All"
+            const src = $("#src").val() || null;
 
             const url = `/data/?page=${page}&start_date=${startDate}&end_date=${endDate}&status=${status}&sgmt=${sgmt}&src=${src}`;
             console.log(`Fetching data from: ${url}`);

@@ -9,6 +9,7 @@ from .models import BhavCopy
 from django.shortcuts import render
 from django.db import models
 import calendar  # Add this import
+from django.db import connection
 
 logger = logging.getLogger(__name__)
 
@@ -16,82 +17,126 @@ def index(request):
     """Render the index.html template."""
     return render(request, 'index.html')
 
+import json
+import calendar
+from datetime import datetime, timedelta
+from django.http import JsonResponse
+from django.db import connection
+
+import json
+import calendar
+import logging  # Import logging module
+from datetime import datetime, timedelta
+from django.http import JsonResponse
+from django.db import connection
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+import json
+import calendar
+import logging
+from datetime import datetime, timedelta
+from django.http import JsonResponse
+from django.db import connection
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 def get_data(request):
     try:
-        logger.debug("Received request for data.")
-
-        # Extracting query parameters
         page = int(request.GET.get("page", 1))
-        start_date = request.GET.get("start_date", None)
-        end_date = request.GET.get("end_date", None)
-        status = request.GET.get("status", None)
-        sgmt = request.GET.get("sgmt", None)
-        src = request.GET.get("src", None)
+        start_date = request.GET.get("start_date")
+        end_date = request.GET.get("end_date")
+        status_filter = request.GET.get("status")
+        sgmt_filter = request.GET.get("sgmt")
+        src_filter = request.GET.get("src")
 
-        logger.debug(f"Request parameters - page: {page}, start_date: {start_date}, end_date: {end_date}, status: {status}, sgmt: {sgmt}, src: {src}")
+        today = datetime.today().date()
 
-        # Handle null parameters by defaulting to the current month
-        if not start_date or start_date == "null":
-            start_date = datetime.now().date().replace(day=1)  # First day of the current month
+        # Convert "null" string values to None
+        if start_date in [None, "", "null"]:
+            start_date = today.replace(day=1)  # Default: First day of the month
         else:
             start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
 
-        if not end_date or end_date == "null":
-            end_date = (datetime.now().date().replace(day=1) + timedelta(days=31)).replace(day=1) - timedelta(days=1)  # Last day of the current month
+        if end_date in [None, "", "null"]:
+            end_date = today  # Default: Today's date
         else:
             end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
 
-        logger.debug(f"Parsed date range - start_date: {start_date}, end_date: {end_date}")
+        date_range = [start_date + timedelta(days=x) for x in range((end_date - start_date).days + 1)]
 
-        # Query the database with filters
-        queryset = BhavCopy.objects.filter(BizDt__range=(start_date, end_date))
+        # Prepare SQL query based on filters
+        query = """
+            SELECT BizDt, Sgmt, Src, COUNT(*) AS RecordCount
+            FROM BhavCopy
+            WHERE BizDt BETWEEN %s AND %s
+        """
+        params = [start_date, end_date]
 
-        if sgmt and sgmt != "null":
-            queryset = queryset.filter(Sgmt=sgmt)
+        if sgmt_filter and sgmt_filter not in ["All", "null"]:
+            query += " AND Sgmt = %s"
+            params.append(sgmt_filter)
 
-        if src and src != "null":
-            queryset = queryset.filter(Src=src)
+        if src_filter and src_filter not in ["All", "null"]:
+            query += " AND Src = %s"
+            params.append(src_filter)
 
-        queryset = queryset.values('BizDt', 'Sgmt', 'Src').annotate(
-            RecordCount=Count('FinInstrmId'),
-            Status=Value('Success', output_field=models.CharField())
-        )
+        query += " GROUP BY BizDt, Sgmt, Src ORDER BY BizDt DESC"
 
+        with connection.cursor() as cursor:
+            cursor.execute(query, params)
+            records = cursor.fetchall()
 
-        # Create a complete date range for the month
-        date_range = [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]
+        # Convert records to dictionary
+        record_dict = {(str(row[0]), row[1], row[2]): row[3] for row in records}
 
-        # Fill in missing dates
-        queryset_dates = {record["BizDt"]: record for record in queryset}
         final_results = []
-        for date in date_range:
-            if date in queryset_dates:
-                record = queryset_dates[date]
-                record["Weekday"] = calendar.day_name[date.weekday()]
-                final_results.append(record)
-            else:
-                final_results.append({
-                    "BizDt": date,
-                    "RecordCount": 0,
-                    "Status": "Failed/Not Present",
-                    "Weekday": calendar.day_name[date.weekday()]
-                })
+        segments = ["CM", "FO", "CD"] if sgmt_filter in ["All", "null", None] else [sgmt_filter]
+        sources = ["NSE"] if src_filter in ["All", "null", None] else [src_filter]
 
-        # Paginate results
-        paginator = Paginator(final_results, 10)
-        results = paginator.page(page)
+        for date in date_range:
+            for sgmt in segments:
+                for src in sources:
+                    key = (str(date), sgmt, src)
+                    if key in record_dict:
+                        final_results.append({
+                            "BizDt": date,
+                            "Sgmt": sgmt,
+                            "Src": src,
+                            "RecordCount": record_dict[key],
+                            "Status": "Success",
+                            "Weekday": calendar.day_name[date.weekday()]
+                        })
+                    elif status_filter in ["Failed/Not Present", "All", "null"]:
+                        final_results.append({
+                            "BizDt": date,
+                            "Sgmt": sgmt,
+                            "Src": src,
+                            "RecordCount": 0,
+                            "Status": "Failed/Not Present",
+                            "Weekday": calendar.day_name[date.weekday()]
+                        })
+
+        # Pagination logic
+        results_per_page = 10
+        total_pages = (len(final_results) + results_per_page - 1) // results_per_page
+        has_previous = page > 1
+        has_next = page < total_pages
+
+        paginated_results = final_results[(page - 1) * results_per_page: page * results_per_page]
 
         return JsonResponse({
-            "results": list(results),
-            "current_page": results.number,
-            "total_pages": paginator.num_pages,
-            "has_next": results.has_next(),
-            "has_previous": results.has_previous()
+            "results": paginated_results,
+            "current_page": page,
+            "total_pages": total_pages,
+            "has_previous": has_previous,
+            "has_next": has_next
         })
 
     except Exception as e:
-        logger.error(f"Error in get_data: {e}")
+        logger.error(f"Error in get_data: {e}", exc_info=True)  # Log error with traceback
         return JsonResponse({"error": str(e)}, status=500)
 
 

@@ -143,14 +143,18 @@ def reload_data_for_date(date_str, sgmt="CM", src="NSE"):
                     # Replace NaN values with None for MySQL compatibility
                     row = row.replace({np.nan: None})
                     cursor.execute("""
-                        INSERT INTO BhavCopy (
+                                                INSERT INTO BhavCopy (
                             TradDt, BizDt, Sgmt, Src, FinInstrmTp, FinInstrmId, ISIN,
                             TckrSymb, SctySrs, XpryDt, FininstrmActlXpryDt, StrkPric, OptnTp,
                             FinInstrmNm, OpnPric, HghPric, LwPric, ClsPric, LastPric, PrvsClsgPric,
                             UndrlygPric, SttlmPric, OpnIntrst, ChngInOpnIntrst, TtlTradgVol,
-                            TtlTrfVal, TtlNbOfTxsExctd, SsnId, NewBrdLotQty, Rmks, Rsvd1, Rsvd2, Rsvd3, Rsvd4
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ON DUPLICATE KEY UPDATE 
+                            TtlTrfVal, TtlNbOfTxsExctd, SsnId, NewBrdLotQty, Rmks, Rsvd1, Rsvd2, Rsvd3, Rsvd4, 
+                            created_at, updated_at
+                        ) VALUES (
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW()
+                        )
+                        ON DUPLICATE KEY UPDATE
                             TradDt = VALUES(TradDt),
                             BizDt = VALUES(BizDt),
                             Sgmt = VALUES(Sgmt),
@@ -183,7 +187,8 @@ def reload_data_for_date(date_str, sgmt="CM", src="NSE"):
                             Rsvd1 = VALUES(Rsvd1),
                             Rsvd2 = VALUES(Rsvd2),
                             Rsvd3 = VALUES(Rsvd3),
-                            Rsvd4 = VALUES(Rsvd4)
+                            Rsvd4 = VALUES(Rsvd4),
+                            updated_at = NOW();
                     """, tuple(row))
                 except mysql.connector.Error as e:
                     print(f"Error inserting/updating row: {row} - {e}")
