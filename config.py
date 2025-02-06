@@ -19,6 +19,10 @@ DB_CONFIG = {
 BASE_URLS = {
     "CM_NSE": "https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{date}_F_0000.csv.zip",
     "FO_NSE": "https://nsearchives.nseindia.com/content/fo/BhavCopy_NSE_FO_0_0_0_{date}_F_0000.csv.zip",
-    "CD_NSE": "https://nsearchives.nseindia.com/archives/cd/bhav/BhavCopy_NSE_CD_0_0_0_{date}_F_0000.csv.zip"
+    "CD_NSE": "https://nsearchives.nseindia.com/archives/cd/bhav/BhavCopy_NSE_CD_0_0_0_{date}_F_0000.csv.zip",
+
+    "CM_BSE":"https://www.bseindia.com/download/BhavCopy/Equity/BhavCopy_BSE_CM_0_0_0_{date}_F_0000.CSV",
+    "FO_BSE":"https://www.bseindia.com/download/Bhavcopy/Derivative/BhavCopy_BSE_FO_0_0_0_{date}_F_0000.CSV",
+    "CD_BSE":"https://www.bseindia.com/bsedata/CIML_bhavcopy/BhavCopy_BSE_CD_0_0_0_{date}_F_0000.CSV"
 }
 
