@@ -2,14 +2,12 @@ import json
 import logging
 from datetime import datetime, timedelta
 from django.http import JsonResponse
-from django.core.paginator import Paginator
-from django.db.models import Count, Value
-from django.db.models.functions import Coalesce
-from .models import BhavCopy
+from django.db.models import Count, Value, Case, When, CharField
 from django.shortcuts import render
-from django.db import models
-import calendar  # Add this import
-from django.db import connection
+from bhavcopy_app.reload_script import reload_data_for_date
+import calendar
+
+from bhavcopy_app import models
 
 logger = logging.getLogger(__name__)
 
@@ -17,132 +15,139 @@ def index(request):
     """Render the index.html template."""
     return render(request, 'index.html')
 
-import json
-import calendar
-from datetime import datetime, timedelta
-from django.http import JsonResponse
-from django.db import connection
-
-import json
-import calendar
-import logging  # Import logging module
-from datetime import datetime, timedelta
-from django.http import JsonResponse
-from django.db import connection
-
-# Configure logging
-logger = logging.getLogger(__name__)
-
-import json
-import calendar
-import logging
-from datetime import datetime, timedelta
-from django.http import JsonResponse
-from django.db import connection
-
-# Configure logging
-logger = logging.getLogger(__name__)
-
 def get_data(request):
     try:
+        # Get query parameters
         page = int(request.GET.get("page", 1))
         start_date = request.GET.get("start_date")
         end_date = request.GET.get("end_date")
-        status_filter = request.GET.get("status")
-        sgmt_filter = request.GET.get("sgmt")
-        src_filter = request.GET.get("src")
+        status = request.GET.get("status", "All")
+        sgmt = request.GET.get("sgmt", "All")
+        src = request.GET.get("src", "All")
 
-        today = datetime.today().date()
+        logger.debug(f"Request parameters - page: {page}, start_date: {start_date}, end_date: {end_date}, status: {status}, sgmt: {sgmt}, src: {src}")
 
-        # Convert "null" string values to None
-        if start_date in [None, "", "null"]:
-            start_date = today.replace(day=1)  # Default: First day of the month
-        else:
-            start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+        # Parse date range
+        start_date = datetime.strptime(start_date, "%Y-%m-%d").date() if start_date and start_date != "null" else (datetime.today() - timedelta(days=30)).date()
+        end_date = datetime.strptime(end_date, "%Y-%m-%d").date() if end_date and end_date != "null" else datetime.today().date()
 
-        if end_date in [None, "", "null"]:
-            end_date = today  # Default: Today's date
-        else:
-            end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+        logger.debug(f"Parsed date range - start_date: {start_date}, end_date: {end_date}")
 
+        # Date range
         date_range = [start_date + timedelta(days=x) for x in range((end_date - start_date).days + 1)]
 
-        # Prepare SQL query based on filters
-        query = """
-            SELECT BizDt, Sgmt, Src, COUNT(*) AS RecordCount
-            FROM BhavCopy
-            WHERE BizDt BETWEEN %s AND %s
-        """
-        params = [start_date, end_date]
+        # Filter segments and sources
+        segments = ["CM", "FO", "CD"] if sgmt == "All" else [sgmt]
+        sources = ["NSE", "BSE"] if src == "All" else [src]
 
-        if sgmt_filter and sgmt_filter not in ["All", "null"]:
-            query += " AND Sgmt = %s"
-            params.append(sgmt_filter)
-
-        if src_filter and src_filter not in ["All", "null"]:
-            query += " AND Src = %s"
-            params.append(src_filter)
-
-        query += " GROUP BY BizDt, Sgmt, Src ORDER BY BizDt DESC"
-
-        with connection.cursor() as cursor:
-            cursor.execute(query, params)
-            records = cursor.fetchall()
-
-        # Convert records to dictionary
-        record_dict = {(str(row[0]), row[1], row[2]): row[3] for row in records}
+        # Fetch data from the database
+        db_results = fetch_database_results(start_date, end_date, segments, sources)
 
         final_results = []
-        segments = ["CM", "FO", "CD"] if sgmt_filter in ["All", "null", None] else [sgmt_filter]
-        sources = ["NSE"] if src_filter in ["All", "null", None] else [src_filter]
+        seen_records = set()  # To track unique records
 
-        for date in date_range:
-            for sgmt in segments:
-                for src in sources:
-                    key = (str(date), sgmt, src)
-                    if key in record_dict:
-                        final_results.append({
-                            "BizDt": date,
-                            "Sgmt": sgmt,
-                            "Src": src,
-                            "RecordCount": record_dict[key],
-                            "Status": "Success",
-                            "Weekday": calendar.day_name[date.weekday()]
-                        })
-                    elif status_filter in ["Failed/Not Present", "All", "null"]:
-                        final_results.append({
-                            "BizDt": date,
-                            "Sgmt": sgmt,
-                            "Src": src,
-                            "RecordCount": 0,
-                            "Status": "Failed/Not Present",
-                            "Weekday": calendar.day_name[date.weekday()]
-                        })
+        # Apply status filter
+        if status == "Success":
+            # Only include records with status "Success"
+            filtered_results = [record for record in db_results if record["RecordCount"] > 0]
+            for record in filtered_results:
+                record["Weekday"] = calendar.day_name[record["TradDt"].weekday()]
+                final_results.append(record)
+        elif status == "Failed/Not Present":
+            # Include default records for missing data
+            for date in date_range:
+                for segment in segments:
+                    for source in sources:
+                        record_key = (date, segment, source)
+                        if not any(record["TradDt"] == date and record["Sgmt"] == segment and record["Src"] == source for record in db_results):
+                            final_results.append({
+                                "TradDt": date,
+                                "Weekday": calendar.day_name[date.weekday()],
+                                "Sgmt": segment,
+                                "Src": source,
+                                "RecordCount": 0,
+                                "Status": "Failed/Not Present"
+                            })
+        else:  # Status == "All"
+            # Include both database records and missing data
+            for date in date_range:
+                for segment in segments:
+                    for source in sources:
+                        matching_record = next((record for record in db_results if record["TradDt"] == date and record["Sgmt"] == segment and record["Src"] == source), None)
+                        if matching_record:
+                            matching_record["Weekday"] = calendar.day_name[matching_record["TradDt"].weekday()]
+                            final_results.append(matching_record)
+                        else:
+                            final_results.append({
+                                "TradDt": date,
+                                "Weekday": calendar.day_name[date.weekday()],
+                                "Sgmt": segment,
+                                "Src": source,
+                                "RecordCount": 0,
+                                "Status": "Failed/Not Present"
+                            })
 
-        # Pagination logic
-        results_per_page = 10
-        total_pages = (len(final_results) + results_per_page - 1) // results_per_page
-        has_previous = page > 1
-        has_next = page < total_pages
+        # Pagination
+        items_per_page = 10
+        start_index = (page - 1) * items_per_page
+        end_index = start_index + items_per_page
+        paginated_results = final_results[start_index:end_index]
 
-        paginated_results = final_results[(page - 1) * results_per_page: page * results_per_page]
-
-        return JsonResponse({
-            "results": paginated_results,
+        # Response
+        response_data = {
             "current_page": page,
-            "total_pages": total_pages,
-            "has_previous": has_previous,
-            "has_next": has_next
-        })
+            "total_pages": (len(final_results) + items_per_page - 1) // items_per_page,
+            "results": paginated_results,
+        }
+
+        return JsonResponse(response_data, safe=False)
+    except Exception as e:
+        logger.error(f"Error in get_data: {e}", exc_info=True)
+        return JsonResponse({"error": "An error occurred while fetching data."}, status=500)
+
+
+def fetch_database_results(start_date, end_date, segments, sources):
+    """
+    Fetch records from the database for the given date range, segments, and sources.
+
+    Args:
+        start_date (date): Start date of the range.
+        end_date (date): End date of the range.
+        segments (list): List of segments to filter (e.g., ['CM', 'FO']).
+        sources (list): List of sources to filter (e.g., ['NSE', 'BSE']).
+
+    Returns:
+        list: A list of dictionaries containing the query results.
+    """
+    from django.db.models import Case, When, Value, CharField, Count
+
+    try:
+        # Query with annotations
+        query = (
+            models.BhavCopy.objects.filter(
+                TradDt__range=(start_date, end_date),
+                Sgmt__in=segments,
+                Src__in=sources,
+            )
+            .values("TradDt", "Sgmt", "Src")
+            .annotate(
+                RecordCount=Count("id"),
+                Status=Case(
+                    When(RecordCount__gt=0, then=Value("Success")),
+                    default=Value("Failed/Not Present"),
+                    output_field=CharField(),
+                )
+            )
+        )
+
+        results = list(query)
+        logger.debug(f"Database Results: {results}")
+        return results
 
     except Exception as e:
-        logger.error(f"Error in get_data: {e}", exc_info=True)  # Log error with traceback
-        return JsonResponse({"error": str(e)}, status=500)
+        logger.error(f"Error in fetch_database_results: {e}", exc_info=True)
+        return []
 
-
-from django.http import JsonResponse
-from .reload_script import reload_data_for_date
-import logging
 
 def reload_date(request, date):
     """Reload data for a specific date."""
@@ -161,8 +166,6 @@ def reload_date(request, date):
             return JsonResponse({"success": False, "error": result["error"]})
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)})
-
-
 
 # Ensure proper logging setup
 logging.basicConfig(level=logging.DEBUG)

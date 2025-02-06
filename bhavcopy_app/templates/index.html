@@ -149,13 +149,13 @@
                         // Disable reload button if RecordCount > 0
                         const isDisabled = row.RecordCount > 0 ? "disabled" : "";
 
-                        const actionButton = `<button class="btn btn-sm btn-warning" onclick="reloadData('${row.BizDt}')" ${isDisabled}>
+                        const actionButton = `<button class="btn btn-sm btn-warning" onclick="reloadData('${row.TradDt}')" ${isDisabled}>
                             Reload <i class="fas fa-sync-alt"></i>
                         </button>`;
 
                         tableBody.append(`
                             <tr>
-                                <td>${row.BizDt}</td>
+                                <td>${row.TradDt}</td>
                                 <td>${row.Weekday}</td>
                                 <td>${row.Sgmt}</td>
                                 <td>${row.Src}</td>

@@ -1,12 +1,13 @@
 from django.db import models
 
 class BhavCopy(models.Model):
+    id = models.AutoField(primary_key=True)  # This will add an auto-increment primary key
     TradDt = models.DateField()  # Trade Date
     BizDt = models.DateField()  # Business Date
     Sgmt = models.CharField(max_length=10)  # Segment
     Src = models.CharField(max_length=10)  # Source
     FinInstrmTp = models.CharField(max_length=10)  # Financial Instrument Type
-    FinInstrmId = models.IntegerField(primary_key=True)  # Financial Instrument ID (set as primary key)
+    FinInstrmId = models.IntegerField()  # Financial Instrument ID
     ISIN = models.CharField(max_length=12)  # ISIN
     TckrSymb = models.CharField(max_length=10)  # Ticker Symbol
     SctySrs = models.CharField(max_length=5, null=True, blank=True)  # Security Series
@@ -27,4 +28,4 @@ class BhavCopy(models.Model):
         managed = False  # Prevent Django from creating/modifying this table
 
     def __str__(self):
-        return f"{self.BizDt} - {self.TckrSymb}"
+        return f"{self.TradDt} - {self.TckrSymb}"
