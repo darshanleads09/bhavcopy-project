@@ -149,7 +149,7 @@
                         // Disable reload button if RecordCount > 0
                         const isDisabled = row.RecordCount > 0 ? "disabled" : "";
 
-                        const actionButton = `<button class="btn btn-sm btn-warning" onclick="reloadData('${row.TradDt}')" ${isDisabled}>
+                        const actionButton = `<button class="btn btn-sm btn-warning" onclick="reloadData('${row.TradDt}','${row.Sgmt}','${row.Src}')" ${isDisabled}>
                             Reload <i class="fas fa-sync-alt"></i>
                         </button>`;
 
@@ -180,10 +180,10 @@
         };
 
         // Reload data for a specific date
-        const reloadData = async (date) => {
+        const reloadData = async (date,sgmt,src) => {
             try {
-                const sgmt = $("#sgmt").val(); // Get selected segment value
-                const src = $("#src").val(); // Get selected source value
+                //const sgmt = $("#sgmt").val(); // Get selected segment value
+                //const src = $("#src").val(); // Get selected source value
 
                 const response = await fetch(`/reload/${date}/`, {
                         method: "POST",

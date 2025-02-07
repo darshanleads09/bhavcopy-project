@@ -89,18 +89,22 @@ def get_data(request):
 
         # Pagination
         items_per_page = 10
+        total_pages = (len(final_results) + items_per_page - 1) // items_per_page
         start_index = (page - 1) * items_per_page
         end_index = start_index + items_per_page
         paginated_results = final_results[start_index:end_index]
 
-        # Response
+        # Adjust response data for pagination
         response_data = {
             "current_page": page,
-            "total_pages": (len(final_results) + items_per_page - 1) // items_per_page,
+            "total_pages": total_pages,
+            "has_next": page < total_pages,
+            "has_previous": page > 1,
             "results": paginated_results,
         }
 
         return JsonResponse(response_data, safe=False)
+
     except Exception as e:
         logger.error(f"Error in get_data: {e}", exc_info=True)
         return JsonResponse({"error": "An error occurred while fetching data."}, status=500)

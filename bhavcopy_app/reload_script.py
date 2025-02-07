@@ -1,6 +1,4 @@
-import pymysql
 import pandas as pd
-import requests
 import zipfile
 import io
 import os
@@ -9,20 +7,68 @@ from config import DB_CONFIG, BASE_URLS
 import time
 import mysql.connector
 import numpy as np
+import requests
 
 DATA_DIR = "D:/bhavcopy_data/"
 
-def fetch_cookies():
-    """Fetch cookies from NSE India to establish a valid session."""
+def fetch_cookies(src):
+    """Fetch cookies from NSE or BSE to establish a valid session."""
     try:
         session = requests.Session()
-        session.get("https://www.nseindia.com", headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.6834.110 Safari/537.36"
-        })
-        return session.cookies
+
+        if src == "NSE":
+            session.get("https://www.nseindia.com", headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.6834.110 Safari/537.36"
+            })
+
+        elif src == "BSE":
+            headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.6834.110 Safari/537.36",
+            "Referer": "https://www.bseindia.com/markets/MarketInfo/BhavCopy.aspx",
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "X-Requested-With": "XMLHttpRequest"
+        }
+
+            # Step 1: Visit the BSE homepage
+            session.get("https://www.bseindia.com", headers=headers)
+
+            # Step 2: Visit Market Info to establish session
+            response = session.get("https://www.bseindia.com/markets/MarketInfo/BhavCopy.aspx", headers=headers)
+
+            if response.status_code == 200:
+                print("✅ BSE Cookies Fetched Successfully!")
+                return session  # Return full session instead of just cookies
+            else:
+                print(f"⚠️ Warning: Unexpected response from BSE ({response.status_code}).")
+                return None
+
+        return session
     except requests.RequestException as e:
-        print(f"Failed to fetch cookies: {e}")
+        print(f"❌ Failed to fetch cookies for {src}: {e}")
         return None
+
+
+def get_headers(src):
+    """Return the appropriate headers for the given source."""
+    if src == "NSE":
+        return {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.6834.110 Safari/537.36",
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": "https://www.nseindia.com/all-reports",
+            "X-Requested-With": "XMLHttpRequest"
+        }
+    elif src == "BSE":
+        return {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.6834.110 Safari/537.36",
+        "Referer": "https://www.bseindia.com/markets/MarketInfo/BhavCopy.aspx",
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "X-Requested-With": "XMLHttpRequest",
+        "upgrade-insecure-requests": "1",
+        "Referrer-Policy": "strict-origin-when-cross-origin"
+    }
 
 def clean_data(df):
     """Clean and preprocess the DataFrame."""
@@ -51,20 +97,12 @@ def reload_data_for_date(date_str, sgmt="CM", src="NSE"):
         print(f"Starting reload for date: {date_str} (formatted: {date_str_formatted})")
 
         # Fetch cookies
-        cookies = fetch_cookies()
-        if not cookies:
-            print("Error: Failed to fetch cookies from NSE.")
-            return {"success": False, "error": "Failed to fetch cookies from NSE."}
-        print("Cookies fetched successfully.")
+        session = fetch_cookies(src)
+        if not session:
+            return {"success": False, "error": f"Failed to fetch cookies from {src}."}
 
         # Define headers
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.6834.110 Safari/537.36",
-            "Accept": "*/*",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Referer": "https://www.nseindia.com/all-reports",
-            "X-Requested-With": "XMLHttpRequest"
-        }
+        headers = get_headers(src)
 
         # Determine the correct file URL
         url_key = f"{sgmt}_{src}"  # Example: CM_NSE, FO_NSE, CD_NSE
@@ -73,48 +111,54 @@ def reload_data_for_date(date_str, sgmt="CM", src="NSE"):
             return {"success": False, "error": f"No URL defined for Sgmt={sgmt}, Src={src}"}
         
         # File download URL
-        #file_url = f"https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{date_str_formatted}_F_0000.csv.zip"
         file_url = BASE_URLS[url_key].format(date=date_str_formatted)
 
         print(f"Selected URL: {file_url}")
 
         # Attempt to download the file with retry logic
+        # Attempt to download the file with retry logic
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                print(f"Attempting to download file for {date_str_formatted} (Attempt {attempt + 1})...")
-                response = requests.get(file_url, headers=headers, cookies=cookies, timeout=30)
+                # Use the same session and headers from fetching cookies
+                response = session.get(file_url, headers=headers, cookies=session.cookies, timeout=30)
+
                 if response.status_code == 200:
-                    print(f"File downloaded successfully for {date_str_formatted}.")
+                    print(f"✅ File downloaded successfully for {date_str_formatted}.")
                     break
+                elif response.status_code == 403:
+                    print(f"🚫 Forbidden (403) error for {date_str_formatted}. Retrying with updated session...")
+                    cookies = fetch_cookies(src)  # Re-fetch cookies and try again
                 elif response.status_code == 404:
-                    print(f"File not found on NSE server for {date_str_formatted}.")
-                    return {"success": False, "error": f"File for {date_str_formatted} not found on NSE server."}
-                else:
-                    print(f"Unexpected response for {date_str_formatted}: {response.status_code}")
-                    return {"success": False, "error": f"Unexpected response: {response.status_code}"}
-            except requests.exceptions.ReadTimeout:
-                print(f"Timeout occurred for {date_str_formatted} (Attempt {attempt + 1}).")
+                    return {"success": False, "error": f"❌ File for {date_str_formatted} not found on {src} server."}
+
+            except requests.RequestException:
                 if attempt < max_retries - 1:
-                    print(f"Retrying in {2 ** attempt} seconds...")
-                    time.sleep(2 ** attempt)
+                    time.sleep(2 ** attempt)  # Exponential backoff
                 else:
-                    print(f"Failed to download file for {date_str_formatted} after multiple retries.")
-                    return {"success": False, "error": f"Timeout after multiple retries for {date_str_formatted}."}
-            except requests.RequestException as e:
-                print(f"RequestException occurred: {e}")
-                return {"success": False, "error": str(e)}
+                    return {"success": False, "error": f"❌ Timeout after multiple retries for {date_str_formatted}."}
+                
+        # Check if the response contains an error page
+        if b"Access Denied" in response.content or b"403 Forbidden" in response.content:
+            print(f"🚫 Error: BSE blocked access for {date_str_formatted}.")
+            return {"success": False, "error": f"BSE blocked access for {date_str_formatted}."}
 
         # Extract the file
         output_dir = os.path.join(DATA_DIR, date_str_formatted)
         os.makedirs(output_dir, exist_ok=True)
-        try:
-            with zipfile.ZipFile(io.BytesIO(response.content)) as z:
-                z.extractall(output_dir)
-            print(f"File extracted successfully for {date_str_formatted}.")
-        except zipfile.BadZipFile:
-            print(f"BadZipFile error occurred while extracting {date_str_formatted}.")
-            return {"success": False, "error": "Failed to extract ZIP file. File might be corrupted."}
+        if src == "NSE":
+            try:
+                with zipfile.ZipFile(io.BytesIO(response.content)) as z:
+                    z.extractall(output_dir)
+                print(f"File extracted successfully for {date_str_formatted}.")
+            except zipfile.BadZipFile:
+                print(f"BadZipFile error occurred while extracting {date_str_formatted}.")
+                return {"success": False, "error": "Failed to extract ZIP file. File might be corrupted."}
+        elif src == "BSE":
+            file_path = os.path.join(output_dir, f"BhavCopy_{src}_{sgmt}_{date_str_formatted}.csv")
+            with open(file_path, "wb") as f:
+                f.write(response.content)
+            print(f"File saved successfully for {date_str_formatted} at {file_path}")
 
         # Locate the CSV file
         csv_file = None
