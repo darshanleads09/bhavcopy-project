@@ -146,6 +146,7 @@ def reload_data_for_date(date_str, sgmt="CM", src="NSE"):
         # Extract the file
         output_dir = os.path.join(DATA_DIR, date_str_formatted)
         os.makedirs(output_dir, exist_ok=True)
+
         if src == "NSE":
             try:
                 with zipfile.ZipFile(io.BytesIO(response.content)) as z:
@@ -155,24 +156,21 @@ def reload_data_for_date(date_str, sgmt="CM", src="NSE"):
                 print(f"BadZipFile error occurred while extracting {date_str_formatted}.")
                 return {"success": False, "error": "Failed to extract ZIP file. File might be corrupted."}
         elif src == "BSE":
-            file_path = os.path.join(output_dir, f"BhavCopy_{src}_{sgmt}_{date_str_formatted}.csv")
+            file_name = f"BhavCopy_{src}_{sgmt}_{date_str_formatted}.csv"
+            file_path = os.path.join(output_dir, file_name)
             with open(file_path, "wb") as f:
                 f.write(response.content)
             print(f"File saved successfully for {date_str_formatted} at {file_path}")
 
-        # Locate the CSV file
-        csv_file = None
-        for root, _, files in os.walk(output_dir):
-            for file in files:
-                if file.endswith(".csv"):
-                    csv_file = os.path.join(root, file)
-                    break
-            if csv_file:
-                break
+        # Locate the specific downloaded CSV file
+        if src == "NSE":
+            csv_file = os.path.join(output_dir, f"BhavCopy_NSE_{sgmt}_0_0_0_{date_str_formatted}_F_0000.csv")
+        elif src == "BSE":
+            csv_file = os.path.join(output_dir, f"BhavCopy_{src}_{sgmt}_{date_str_formatted}.csv")
 
-        if not csv_file:
-            print(f"No CSV file found after extraction for {date_str_formatted}.")
-            return {"success": False, "error": f"No CSV file found for {date_str_formatted}."}
+        if not os.path.exists(csv_file):
+            print(f"No matching CSV file found for {date_str_formatted}.")
+            return {"success": False, "error": f"No matching CSV file found for {date_str_formatted}."}
         print(f"CSV file located: {csv_file}")
 
         # Insert data into MySQL database

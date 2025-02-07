@@ -180,12 +180,14 @@
         };
 
         // Reload data for a specific date
-        const reloadData = async (date,sgmt,src) => {
-            try {
-                //const sgmt = $("#sgmt").val(); // Get selected segment value
-                //const src = $("#src").val(); // Get selected source value
+        const reloadData = async (date, sgmt, src) => {
+                try {
+                    // Show spinner on the button
+                    const reloadButton = $(`button[onclick="reloadData('${date}','${sgmt}','${src}')"]`);
+                    reloadButton.prop("disabled", true);
+                    reloadButton.html(`<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Reloading...`);
 
-                const response = await fetch(`/reload/${date}/`, {
+                    const response = await fetch(`/reload/${date}/`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -193,19 +195,30 @@
                             src: src,
                         }),
                     });
-                const data = await response.json();
 
-                if (data.success) {
-                    alert(`Data for ${date} reloaded successfully!`);
-                    fetchData(currentPage);
-                } else {
-                    alert(`Failed to reload data for ${date}: ${data.error}`);
+                    const data = await response.json();
+
+                    // Reset button state
+                    reloadButton.prop("disabled", false);
+                    reloadButton.html('Reload <i class="fas fa-sync-alt"></i>');
+
+                    if (data.success) {
+                        alert(`Data for ${date} reloaded successfully!`);
+                        fetchData(currentPage);
+                    } else {
+                        alert(`Failed to reload data for ${date}: ${data.error}`);
+                    }
+                } catch (error) {
+                    console.error("Error reloading data:", error);
+                    alert("An unexpected error occurred while reloading data.");
+
+                    // Reset button state in case of an error
+                    const reloadButton = $(`button[onclick="reloadData('${date}','${sgmt}','${src}')"]`);
+                    reloadButton.prop("disabled", false);
+                    reloadButton.html('Reload <i class="fas fa-sync-alt"></i>');
                 }
-            } catch (error) {
-                console.error("Error reloading data:", error);
-                alert("An unexpected error occurred while reloading data.");
-            }
-        };
+            };
+
 
         // Pagination buttons
         $("#prev-button").click(() => fetchData(currentPage - 1));
