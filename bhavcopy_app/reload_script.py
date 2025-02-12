@@ -3,6 +3,7 @@ import zipfile
 import io
 import os
 from datetime import datetime
+from bhavcopy_app.mcxdownloader import get_bhavcopy_data
 from config import DB_CONFIG, BASE_URLS
 import time
 import mysql.connector
@@ -257,3 +258,22 @@ if __name__ == "__main__":
         print(result["message"])
     else:
         print(f"Error: {result['error']}")
+
+
+################################################################## MCX.html START ######################################################
+def reload_data_for_date_mcx(date_str):
+    """Reload data for the specified date with detailed error handling and MySQL insertion."""
+    try:
+        # Format date for NSE URL
+        reload_date = datetime.strptime(date_str, '%Y-%m-%d')
+        date_str_formatted = reload_date.strftime("%Y%m%d")
+        print(f"Starting reload for date: {date_str} (formatted: {date_str_formatted})")
+
+        get_bhavcopy_data(date_str_formatted)
+
+        return {"success": True, "message": f"Data for {date_str_formatted} successfully reloaded."}
+
+    except Exception as e:
+        print(f"Unexpected error occurred for {date_str}: {e}")
+        return {"success": False, "error": str(e)}
+################################################################## MCX.html END ######################################################
