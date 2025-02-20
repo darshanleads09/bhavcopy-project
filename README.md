@@ -1,7 +1,3 @@
-Here is a well-structured **README.md** file for your **bhavcopy-project** repository on GitHub. This document provides an overview, installation steps, usage instructions, and troubleshooting tips.
-
----
-
 ## **BhavCopy Project 📊**
 ### **Stock Market Data Processing with Django**
 This project is a **Django-based web application** that fetches, processes, and displays BhavCopy data from multiple stock exchanges (**NSE, BSE, MCX**). It provides **data visualization, filtering, pagination, and automatic downloading** of historical stock data.
@@ -67,7 +63,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'bhavcopynew',
         'USER': 'root',
-        'PASSWORD': 'Newday@123',
+        'PASSWORD': '##########',
         'HOST': '127.0.0.1',
         'PORT': '3306',
     }
