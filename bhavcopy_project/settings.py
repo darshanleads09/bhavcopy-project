@@ -25,8 +25,15 @@ SECRET_KEY = 'django-insecure-(-3+^x5*8bw^!1slxa_maebgyb!=b9zlb@39oevlxdkd$#4tg0
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    '127.0.0.1', 
+    'localhost', 
+    'c1d1-2405-201-51-6001-f40c-681f-bfcf-4d9e.ngrok-free.app'
+]
 
+CORS_ALLOWED_ORIGINS = [
+    "https://uat.uniquefinserve.com",
+]
 
 # Application definition
 
