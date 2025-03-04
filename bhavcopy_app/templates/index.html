@@ -49,7 +49,7 @@
                     <a class="nav-link" href="#">Home</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/mcx/">MCX</a>
+                    <a class="nav-link" href="/app2/mcx/">MCX</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="#">NCDEX</a>
@@ -155,7 +155,7 @@
             const sgmt = $("#sgmt").val() || null; // Empty string indicates "All"
             const src = $("#src").val() || null;
 
-            const url = `/data/?page=${page}&start_date=${startDate}&end_date=${endDate}&status=${status}&sgmt=${sgmt}&src=${src}`;
+            const url = `/app2/data/?page=${page}&start_date=${startDate}&end_date=${endDate}&status=${status}&sgmt=${sgmt}&src=${src}`;
             console.log(`Fetching data from: ${url}`);
 
             try {
@@ -211,7 +211,7 @@
                     reloadButton.prop("disabled", true);
                     reloadButton.html(`<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Reloading...`);
 
-                    const response = await fetch(`/reload/${date}/`, {
+                    const response = await fetch(`/app2/reload/${date}/`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
